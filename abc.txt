@@ -1,0 +1,1289 @@
+Praccal No :- 1
+
+Aim :- Congure IP SLA Tracking and Path Control
+Requirement :- GNS3 , Serial Connecon ,c3725 ,3 Routers , 2 wires Connecon
+Topology
+Conguraons
+R1
+hostname R1
+interface Loopback 0
+ip address 192.168.1.1 255.255.255.0
+interface Serial0/0
+ip address 209.165.201.2 255.255.255.252
+clock rate 128000
+bandwidth 128
+no shutdown
+interface Serial0/1
+ip address 209.165.202.130 255.255.255.252
+bandwidth 128
+no shutdown
+R2
+Router ISP1 (R2)
+hostname ISP1
+interface Loopback0
+ip address 209.165.200.254 255.255.255.255
+interface Loopback1
+ip address 209.165.201.30 255.255.255.255
+interface Serial0/0
+ip address 209.165.201.1 255.255.255.252
+bandwidth 128
+no shutdown
+interface Serial0/1
+ip address 209.165.200.225 255.255.255.252
+clock rate 128000
+bandwidth 128
+no shutdown
+R3
+hostname ISP2
+interface Loopback0
+ip address 209.165.200.254 255.255.255.255
+interface Loopback1
+ip address 209.165.202.158 255.255.255.255
+interface Serial0/0
+ip address 209.165.202.129 255.255.255.252
+clock rate 128000
+bandwidth 128
+no shutdown
+interface Serial0/1
+descripon ISP2 --&gt; ISP1
+ip address 209.165.200.226 255.255.255.252
+bandwidth 128
+no shutdown
+R1# show interfaces description | include up
+Step 2: Configure static routing.
+Router R1
+R1(config)# ip route 0.0.0.0 0.0.0.0 209.165.201.1
+R1(config)#
+Router ISP1 (R2)
+ISP1(config)# router eigrp 1
+network 209.165.200.224 0.0.0.3
+network 209.165.201.0 0.0.0.31
+no auto-summary
+exit
+ip route 192.168.1.0 255.255.255.0 209.165.201.2
+Router ISP2 (R3)
+ISP2(config)# router eigrp 1
+ISP2(config-router)# network 209.165.200.224 0.0.0.3
+network 209.165.202.128 0.0.0.31
+no auto-summary
+exit
+ip route 192.168.1.0 255.255.255.0 209.165.202.130
+R1#tclsh
+foreach address {
+209.165.200.254
+209.165.201.30
+209.165.202.158
+} {
+ping $address source 192.168.1.1
+}
+foreach address {
+209.165.200.254
+209.165.201.30
+209.165.202.158
+} {
+trace $address source 192.168.1.1
+}
+Step 3: Configure IP SLA probes.
+R1(config)# ip sla 11
+icmp-echo 209.165.201.30
+frequency 10
+exit
+R1(config)# ip sla schedule 11 life forever start-time now /
+R1# show ip sla monitor configuration 11
+R1# show ip sla configuration 11
+R1# show ip sla statistics
+R1(config)# ip sla 22 / ip sla monitor 2
+R1(config-ip-sla)# icmp-echo 209.165.202.158
+R1(config-ip-sla-echo)# frequency 10
+R1(config-ip-sla-echo)# exit
+R1(config)#
+R1(config)# ip sla schedule 22 life forever start-time now
+R1(config)# end
+R1#
+R1# show ip sla configuration 22
+R1# show ip sla configuration 22
+R1# show ip sla statistics 22
+Step 4: Configure tracking options.
+R1(config)# no ip route 0.0.0.0 0.0.0.0 209.165.201.1
+R1(config)# ip route 0.0.0.0 0.0.0.0 209.165.201.1 5
+R1(config)# exit
+R1# show ip route | begin Gateway
+R1(config)# track 1 ip sla 11 reachability / track 1 rtr 11
+reachability
+R1(config-track)#
+R1(config-track)# delay down 10 up 1
+R1(config-track)# exit
+R1(config)#
+R1# debug ip routing
+R1(config)# ip route 0.0.0.0 0.0.0.0 209.165.201.1 2 track 1
+R1(config)#
+R1(config)# track 1 rtr 22 reachability
+R1(config-track)# delay down 10 up 1
+R1(config-track)# exit
+R1(config)#
+R1(config)# ip route 0.0.0.0 0.0.0.0 209.165.202.129 3 track 2
+R1(config)#
+R1#show ip route | begin Gateway
+Step 5: Verify IP SLA operation.
+Router 2
+ISP1(config-if)# int lo1
+ISP1(config-if)# shutdown
+ISP1(config-if)#
+R1# show ip route | begin Gateway
+R1# show ip sla statistics / show ip sla monitor statistics
+R1# trace 209.165.200.254 source 192.168.1.1
+Router2
+ISP1(config-if)# no shutdown
+Notice the output of the debug ip routing command on R1.
+R1#updating static 0.0.0.0/0 (0x0) : via 209.165.202.129 0
+1048578
+R1# show ip sla statistics
+Output
+R1# show ip route | begin Gateway
+Modern Networking
+
+Practical 2:-
+
+AIM :- Using AS_Path Configuration
+Requirements
+● 3 routers (Cisco IOS Release 15.2 or comparable)
+● Serial and Ethernet cables
+Topology:-
+Step 1:- Prepare the routers as given below. Take router c2691.
+Step 2:- Configure the hostname and interface addresses
+Router R1 (hostname SanJose)
+conf t
+hostname SanJose
+int loopback0
+ip add 10.1.1.1 255.255.255.0
+int s0/0
+ip add 192.168.1.5 255.255.255.0
+no shut
+Router R2 (hostname ISP)
+conf t
+hostname
+int loopback0
+ip add 10.2.2.1 255.255.255.0
+int s0/0
+ip add 192.168.1.6 255.255.255.0
+no shut
+int s0/1
+ip add 172.24.1.6 255.255.255.0
+no shut
+Router R3 (hostname Customer)
+conf t
+hostname
+int loopback0
+ip add 10.3.3.1 255.255.255.0
+int s0/1
+ip add 172.24.1.5 255.255.255.0
+no shut
+Step 3: Configure BGP
+a. Configure BGP for normal operation. Enter the appropriate BGP commands on each router
+so that they identify their BGP neighbors and advertise their loopback networks.
+b. Verify that these routers have established the appropriate neighbor relationships by issuing the
+show ip bgp neighbors command on each router.
+Step 4: Remove the private AS.
+a. Display the SanJose routing table using the show ip route command. SanJose should have a
+route to both 10.2.2.0 and 10.3.3.0. Troubleshoot if necessary.
+B & C. Ping the 10.3.3.1 address from SanJose.
+b. Check the BGP table from SanJose by using the show ip bgp command. Note the AS path for the
+10.3.3.0 network. The AS 65000 should be listed in the path to 10.3.3.0.
+c. Configure ISP to strip the private AS numbers from BGP routes exchanged with SanJose
+using the following commands.
+d. After issuing these commands, use the clear ip bgp * command on ISP to reestablish the BGP
+relationship between the three routers. Wait several seconds and then return to SanJose to check its
+routing table.
+Note: The clear ip bgp * soft command can also be used to force each router to resend its BGP table.
+e. Now check the BGP table on SanJose. The AS_ PATH to the 10.3.3.0 network should be AS
+300. It no longer has the private AS in the path.
+Step 5: Use the AS_PATH attribute to filter routes.
+a. Configure a special kind of access list to match BGP routes with an AS_PATH attribute that both
+begins and ends with the number 100. Enter the following commands on ISP.
+b. Apply the configured access list using the neighbor command with the filter-list option.
+c. Use the clear ip bgp * command to reset the routing information. Wait several seconds
+and then check the routing table for ISP. The route to 10.1.1.0 should be in the routing table.
+d. Check the routing table for CustRtr. It should not have a route to 10.1.1.0 in its routing table.
+e. Return to ISP and verify that the filter is working as intended. Issue the show ip bgp regexp
+^100$ command.
+f. Run the following Tcl script on all routers to verify whether there is connectivity. All pings from
+ISP should be successful. SanJose should not be able to ping the CustRtr loopback 10.3.3.1 or the WAN
+link
+Output:-
+
+Practical No : 03
+
+Aim :- Configuring IBGP and EBGP Sessions, Local Preference, and MED
+Requirements:-
+● 3 routers (Cisco IOS Release 15.2 or comparable)
+● Serial and Ethernet cables
+Topology:-
+Objectives
+● For IBGP peers to correctly exchange routing information, use the next-hop-self
+command with the Local-Preference and MED attributes.
+● Ensure that the flat-rate, unlimited-use T1 link is used for sending and receiving
+data to and from the AS 200 on ISP and that the metered T1 only be used in the
+event that the primary T1 link has failed.
+Step 1: Configure interface addresses.
+a. Using the addressing scheme in the diagram, create the loopback interfaces and apply
+IPv4 addresses to these and the serial interfaces on ISP (R1), Airoli (R2), and Thane
+(R3).
+Router R1 (hostname ISP)
+ISP(config)# interface Loopback0
+ISP(config-if)# ip address 192.168.100.1 255.255.255.0
+ISP(config-if)# exit
+ISP(config)# interface Serial0/0/0
+ISP(config-if)# ip address 192.168.1.5 255.255.255.252
+ISP(config-if)# no shutdown
+ISP(config-if)# exit
+ISP(config)# interface Serial0/0/1
+ISP(config-if)# ip address 192.168.1.1 255.255.255.252
+ISP(config-if)# no shutdown
+ISP(config-if)# end
+Router R2 (hostname Airoli)
+Airoli(config)# interface Loopback0
+Airoli(config-if)# ip address 172.16.64.1 255.255.255.0
+Airoli(config-if)# exit
+Airoli(config)# interface Serial0/0/0
+Airoli(config-if)# ip address 192.168.1.6 255.255.255.252
+Airoli(config-if)# no shutdown
+Airoli(config-if)# exit
+Airoli(config)# interface Serial0/0/1
+Airoli(config-if)# ip address 172.16.1.1 255.255.255.0
+Airoli(config-if)# no shutdown
+Airoli(config-if)# end
+Airoli#
+Router R3 (hostname Thane)
+Thane(config)# interface Loopback0
+Thane(config-if)# ip address 172.16.32.1 255.255.255.0
+Thane(config-if)# exit
+Thane(config)# interface Serial0/0/0
+Thane(config-if)# ip address 192.168.1.2 255.255.255.252
+Thane(config-if)# clock rate 128000
+Thane(config-if)# no shutdown
+Thane(config-if)# exit Thane(config)#
+interface Serial0/0/1
+Thane(config-if)# ip address 172.16.1.2 255.255.255.0
+Thane(config-if)# no shutdown
+Thane(config-if)# end
+Step 2: Configure EIGRP.
+Configure EIGRP between the Airoli and Thane routers. (Note: If using an IOS prior to 15.0, use the no
+auto-summary router configuration command to disable automatic summarization. This command is the
+default beginning with IOS 15.)
+Airoli(config)# router eigrp 1
+Airoli(config-router)# network 172.16.0.0
+Thane(config)# router eigrp 1
+Thane(config-router)# network 172.16.0.0
+Step 3: Configure IBGP and verify BGP neighbors.
+b. Configure IBGP between the Airoli and Thane routers. On the Airoli router, enter the
+following configuration.
+Airoli(config)# router bgp 64512
+Airoli(config-router)# neighbor 172.16.32.1 remote-as 64512
+Airoli(config-router)# neighbor 172.16.32.1 update-source lo0
+If multiple pathways to the BGP neighbor exist, the router can use multiple IP interfaces
+to communicate with the neighbor. The source IP address therefore depends
+on the outgoing interface. The update-source lo0 command instructs the router to use
+the IP address of the interface Loopback0 as the source IP address for all BGP messages
+sent to that neighbor.
+c. Complete the IBGP configuration on Thane using the following commands.
+Thane(config)# router bgp 64512
+Thane(config-router)# neighbor 172.16.64.1 remote-as 64512
+Thane(config-router)# neighbor 172.16.64.1 update-source lo0
+d. Verify that Airoli and Thane become BGP neighbors by issuing the show ip bgp neighborscommand
+on Airoli. View the following partial output. If the BGP state is not established, troubleshoot the
+connection.
+Thane# show ip bgp neighbors
+Step 4: Configure EBGP and verify BGP neighbors.
+e. Configure ISP to run EBGP with Airoli and Thane. Enter the following commands on
+ISP.
+ISP(config)# router bgp 200
+ISP(config-router)# neighbor 192.168.1.6 remote-as 64512
+ISP(config-router)# neighbor 192.168.1.2 remote-as 64512
+ISP(config-router)# network 192.168.100.0
+Because EBGP sessions are almost always established over point-to-point links, there is
+no reason to use the update-source keyword in this configuration. Only one path exists
+between the peers. If this path goes down, alternative paths are not available.
+f. Configure a discard static route for the 172.16.0.0/16 network. Any packets that do
+not have a more specific match (longer match) for a 172.16.0.0 subnet will be
+dropped instead of sent to the ISP. Later in this lab we will configure a default route
+to the ISP.
+Airoli(config)# ip route 172.16.0.0 255.255.0.0 null0
+i. Configure Airoli as an EBGP peer to ISP.
+Airoli(config)# router bgp 64512
+Airoli(config-router)# neighbor 192.168.1.5 remote-as 200
+Airoli(config-router)# network 172.16.0.0
+j. Use the show ip bgp neighbors command to verify that Airoli and ISP have reached
+the established state. Troubleshoot if necessary.
+Airoli# show ip bgp neighbors
+k. Configure a discard static route for 172.16.0.0/16 on Thane and as an EBGP peer to
+ISP.
+Thane(config)# ip route 172.16.0.0 255.255.0.0 null0
+Thane(config)# router bgp 64512
+Thane(config-router)# neighbor 192.168.1.1 remote-as 200
+Thane(config-router)# network 172.16.0.0
+Step 5: View BGP summary output.
+In Step 4, the show ip bgp neighbors command was used to verify that Airoli and ISP had
+reached the established state. A useful alternative command is show ip bgp summary.
+The output should be similar to the following.
+Thane# show ip bgp summary
+Step 6: Verify which path the traffic takes.
+l. Clear the IP BGP conversation with the clear ip bgp * command on ISP. Wait for the conversations to
+reestablish with each SanJose router.
+ISP# clear ip bgp *
+m. Test whether ISP can ping the loopback 0 address of 172.16.64.1 on Airoli and the serial link between
+Airoli and Thane, 172.16.1.1.
+ISP# ping 172.16.64.1
+ISP# ping 172.16.1.1
+n. Now ping from ISP to the loopback 0 address of 172.16.32.1 on Thane and the serial
+link between Airoli and Thane, 172.16.1.2.
+ISP# ping 172.16.32.1
+ISP# ping 172.16.1.2
+o. Issue the show ip bgp command on ISP to verify BGP routes and metrics.
+ISP# show ip bgp
+p. At this point, the ISP router should be able to get to each network connected to Airoli
+and Thane from the loopback address 192.168.100.1. Use the extended ping command
+and specify the source address of ISP Lo0 to test.
+ISP# ping 172.16.1.1 source 192.168.100.1
+ISP# ping 172.16.32.1 source 192.168.100.1
+ISP# ping 172.16.1.2 source 192.168.100.1
+ISP# ping 172.16.64.1 source 192.168.100.1
+ISP# ping
+Step 7: Configure the BGP next-hop-self feature.
+Airoli is unaware of the link between ISP and Thane, and Thane is unaware of the link
+between ISP and Airoli. Before ISP can successfully ping all the internal serial interfaces of
+AS 64512, these serial links should be advertised via BGP on the ISP router. This can also
+be resolved via EIGRP on each SanJose router. One method is for ISP to advertise these
+links.
+q. Issue the following commands on the ISP router.
+ISP(config)# router bgp 200
+ISP(config-router)# network 192.168.1.0 mask 255.255.255.252
+ISP(config-router)# network 192.168.1.4 mask 255.255.255.252
+r. Issue the show ip bgp command to verify that the ISP is correctly injecting its own WAN
+links into BGP.
+ISP# show ip bgp
+s. Verify on Airoli and Thane that the opposite WAN link is included in the routing
+table. The output from Thane is as follows.
+Thane# show ip route
+t. To better understand the next-hop-self command we will remove ISP advertising its
+two WAN links and shutdown the WAN link between ISP and Thane. The only
+possible path from Thane to ISP’s 192.168.100.0/24 is through Airoli.
+ISP(config)# router bgp 200
+ISP(config-router)# no network 192.168.1.0 mask 255.255.255.252
+ISP(config-router)# no network 192.168.1.4 mask 255.255.255.252
+ISP(config-router)# exit
+ISP(config)# interface serial 0/1
+ISP(config-if)# shutdown
+u. Display Thane’s BGP table using the show ip bgp command and the IPv4 routing
+table with show ip route.
+Thane# show ip bgp
+Thane# show ip route
+v. Issue the next-hop-self command on Airoli and Thane to advertise themselves as the
+next hop to their IBGP peer.
+Airoli(config)# router bgp 64512
+Airoli(config-router)# neighbor 172.16.32.1 next-hop-self
+Thane(config)# router bgp 64512
+Thane(config-router)# neighbor 172.16.64.1 next-hop-self
+w. Reset BGP operation on either router with the clear ip bgp * command.
+Airoli# clear ip bgp *
+Thane# clear ip bgp *
+x. After the routers have returned to established BGP speakers, issue the show ip bgp
+command on Thane and notice that the next hop is now Airoli instead of ISP.
+Thane# show ip bgp
+y. The show ip route command on Thane now displays the 192.168.100.0/24 network
+because Airoli is the next hop, 172.16.64.1, which is reachable from Thane.
+Thane# show ip route
+z. Before configuring the next BGP attribute, restore the WAN link between ISP and
+SanJose3. This will change the BGP table and routing table on both routers. For
+example, Thane’s routing table shows 192.168.100.0/24 will now have a better path
+through ISP.
+ISP(config)# interface serial 0/1
+ISP(config-if)# no shutdown
+Thane# show ip route
+Step 8: Set BGP local preference.
+At this point, everything looks good, with the exception of default routes, the outbound flow
+of data, and inbound packet flow.
+a. Because the local preference value is shared between IBGP neighbors, configure a
+simple route map that references the local preference value on Airoli and Thane. This
+policy adjusts outbound traffic to prefer the link off the Airoli router instead of the
+metered T1 off Thane.
+Airoli(config)# route-map PRIMARY_T1_IN permit 10
+Airoli(config-route-map)# set local-preference 150
+Airoli(config-route-map)# exit
+Airoli(config)# router bgp 64512
+Airoli(config-router)# neighbor 192.168.1.5 route-map PRIMARY_T1_IN in
+Thane(config)# route-map SECONDARY_T1_IN permit 10
+Thane(config-route-map)# set local-preference 125
+Airoli(config-route-map)# exit
+Thane(config)# router bgp 64512
+Thane(config-router)# neighbor 192.168.1.1 route-map SECONDARY_T1_IN in
+b. Use the clear ip bgp * soft command after configuring this new policy. When the
+conversations have been reestablished, issue the show ip bgp command on Airoli and
+Thane.
+Airoli# clear ip bgp * soft
+Thane# clear ip bgp * soft
+Airoli# show ip bgp
+Thane# show ip bgp
+This now indicates that routing to the loopback segment for ISP 192.168.100.0 /24 can
+be reached only through the link common to Airoli and ISP. Thane’s next hop to
+192.168.100.0/24 is Airoli because both routers have been configured using the nexthop-self command.
+Step 9: Set BGP MED.
+a. In the previous step we saw that Airoli and Thane will route traffic for 192.168.100.0/24
+using the link between Airoli and ISP. Examine what the return path ISP takes to reach AS
+64512. Notice that the return path is different from the original path. This is known as
+asymmetric routing and is not necessarily an unwanted trait.
+ISP# show ip bgp
+ISP# show ip route
+b. Use an extended ping command to verify this situation. Specify the record option
+and compare your output to the following. Notice the return path using the exit
+interface 192.168.1.1 to Thane.
+Thane# ping
+
+If you are unfamiliar with the record option, the important thing to note is that each IP
+address in brackets is an outgoing interface. The output can be interpreted as follows:
+1. Aping that is sourced from 172.16.32.1 exits Thane through s0/0/1, 172.16.1.2. It
+then arrives at the s0/0/1 interface for Airoli.
+2. Airoli S0/0/0, 192.168.1.6, routes the packet out to arrive at the S0/0/0 interface of
+ISP.
+3. The target of 192.168.100.1 is reached: 192.168.100.1.
+4. The packet is next forwarded out the S0/0/1, 192.168.1.1 interface for ISP and
+arrives at the S0/0/0 interface for Thane.
+5. Thane then forwards the packet out the last interface, loopback 0, 172.16.32.1.
+Although the unlimited use of the T1 from Airoli is preferred here, ISP currently takes the
+link from Thane for all return traffic.
+c. Create a new policy to force the ISP router to return all traffic via Airoli. Create a
+second route map utilizing the MED (metric) that is shared between EBGP neighbors.
+Airoli(config)# route-map PRIMARY_T1_MED_OUT permit 10
+Airoli(config-route-map)# set Metric 50
+Airoli(config-route-map)# exit
+Airoli(config)# router bgp 64512
+Airoli(config-router)# neighbor 192.168.1.5 route-map PRIMARY_T1_MED_OUT out
+Thane(config)# route-map SECONDARY_T1_MED_OUT permit 10
+Thane(config-route-map)# set Metric 75
+Thane(config-route-map)# exit
+Thane(config)# router bgp 64512
+Thane(config-router)# neighbor 192.168.1.1 route-map SECONDARY_T1_MED_OUT out
+d. Use the clear ip bgp * soft command after issuing this new policy. Issuing the show
+ip bgp command as follows on Airoli or Thane does not indicate anything about this
+newly defined policy.
+Airoli# clear ip bgp * soft
+Thane# clear ip bgp * soft
+Airoli# show ip bgp
+Thane# show ip bgp
+e. Reissue an extended ping command with the record command. Notice the change in
+return path using the exit interface 192.168.1.5 to Airoli.
+Thane# ping
+ISP# show ip bgp
+Step 10: Establish a default route.
+The final step is to establish a default route that uses a policy statement that adjusts to
+changes in the network.
+f. Configure ISP to inject a default route to both Airoli and Thane using BGP using
+the default-originate command. This command does not require the presence of
+0.0.0.0 in the ISP router. Configure the 10.0.0.0/8 network which will not be
+advertised using BGP. This network will be used to test the default route on Airoli
+and Thane.
+ISP(config)# router bgp 200
+ISP(config-router)# neighbor 192.168.1.6 default-originate
+ISP(config-router)# neighbor 192.168.1.2 default-originate
+ISP(config-router)# exit
+ISP(config)# interface loopback 10
+ISP(config-if)# ip address 10.0.0.1 255.255.255.0
+g. Verify that both routers have received the default route by examining the routing
+tables on Airoli and Thane. Notice that both routers prefer the route between
+Airoli and ISP.
+Airoli# show ip route
+Thane# show ip route
+h. The preferred default route is by way of Airoli because of the higher local
+preference attribute configured on Airoli earlier.
+Thane# show ip bgp
+i. Using the traceroute command verify that packets to 10.0.0.1 is using the default route
+through Airoli.
+Thane# traceroute 10.0.0.1
+j. Next, test how BGP adapts to using a different default route when the path between
+Airoli and ISP goes down.
+ISP(config)# interface serial 0/0
+ISP(config-if)# shutdown
+k. Verify that both routers are modified their routing tables with the default route using
+the path between Thane and ISP.
+Airoli# show ip route
+Thane# show ip route
+l. Verify the new path using the traceroute command to 10.0.0.1 from Airoli. Notice the
+default route is now through Thane.
+OUTPUT :-
+Airoli# trace 10.0.0
+
+Practical 4
+
+Aim: Secure the Management Plane
+Required Resources
+ 3 routers (Cisco IOS Release c7200 image)  Serial and Ethernet cables
+Topology
+Step 1: Configure loopbacks and assign addresses. Cable the network as shown in the topology diagram. Erase the startup configuration andreload each router to clear previous configurations. Using the addressing scheme in the
+diagram, apply the IP addresses to the interfaces on the R1, R2, and R3 routers. R1
+hostname R1
+interface Loopback 0
+description R1 LAN
+ip address 192.168.1.1 255.255.255.0
+exit
+interface Serial 3/0
+description R1 --> R2
+ip address 10.1.1.1 255.255.255.252
+clock rate 128000
+no shutdown
+exit
+end
+R2
+hostname R2
+interface Serial 3/0
+description R2 --> R1
+ip address 10.1.1.2 255.255.255.252
+no shutdown
+exit
+interface Serial 3/1
+description R2 --> R3
+ip address 10.2.2.1 255.255.255.252
+clock rate 128000
+no shutdown
+exit
+end
+R3
+hostname R3
+interface Loopback0
+description R3 LAN
+ip address 192.168.3.1 255.255.255.0
+exit
+interface Serial 3/1
+description R3 --> R2
+ip address 10.2.2.2 255.255.255.252
+no shutdown
+exit
+end
+Step 2: Configure static routes. [a]: On R1, configure a default static route to ISP. R1(config)# ip route 0.0.0.0 0.0.0.0 10.1.1.2
+[b]: On R3, configure a default static route to ISP. R3(config)# ip route 0.0.0.0 0.0.0.0 10.2.2.1
+[c]: On R2, configure two static routes. R2(config)# ip route 192.168.1.0 255.255.255.0 10.1.1.1
+R2(config)# ip route 192.168.3.0 255.255.255.0 10.2.2.2
+[d]: From the R1 router, run the following Tcl script to verify connectivity. foreach address
+{ 192.168.1.1
+10.1.1.1
+10.1.1.2
+10.2.2.1
+10.2.2.2
+192.168.3.1
+} { ping $address }
+Step 3: Secure management access. [a] : On R1, use the security passwords command to set a minimum password length of 10
+characters. R1(config)# security passwords min-length 10
+[b] : Configure the enable secret encrypted password on both routers. R1(config)# enable secret class12345
+[c] : Configure a console password and enable login for routers. For additional security, the exectimeout command causes the line to log out after 5 minutes of inactivity. The logging synchronous
+command prevents console messages from interrupting command entry. R1(config)# line console 0
+R1(config-line)# password ciscoconpass
+R1(config-line)# exec-timeout 5 0
+R1(config-line)# login
+R1(config-line)# logging synchronous
+R1(config-line)# exit
+R1(config)#
+[d] : Configure the password on the vty lines for router R1. R1(config)# line vty 0 4
+R1(config-line)# password ciscovtypass
+R1(config-line)# exec-timeout 5 0
+R1(config-line)# login
+R1(config-line)# exit
+R1(config)#
+[e] : The aux port is a legacy port used to manage a router remotely using a modemand is hardlyever
+used. Therefore, disable the aux port. R1(config)# line aux 0
+R1(config-line)# no exec
+R1(config-line)# end
+R1#
+[f] : Enter privileged EXEC mode and issue the show run command. Can you read the enable secret
+password? Why or why not?
+[g] : Use the service password-encryption command to encrypt the line console and vty passwords. R1(config)# service password-encryption
+R1(config)#
+[h] : Issue the show run command. Can you read the console, aux, and vty passwords? Why or whynot?
+
+[i] : Configure a warning to unauthorized users with a message-of-the-day (MOTD) banner usingthebanner motd command. When a user connects to one of the routers, the MOTD banner appears
+before the login prompt. In this example, the dollar sign ($) is used to start and end the message. R1(config)# banner motd $Unauthorized access strictly prohibited!$
+R1(config)# exit
+[j] : Issue the show run command. What does the $ convert to in the output?
+
+[k] : Repeat the configuration portion of steps 3a through 3k on router R3. Step 4: Configure enhanced username password security. To increase the encryption level of console and VTY lines, it is recommended to enable
+authentication using the local database. The local database consists of usernames and passwordcombinations that are created locally on each device. The local and VTY lines are configured torefer
+to the local database when authenticating a user. [a]: To create local database entry encrypted to level 4 (SHA256), use the username name secret
+password global configuration command. In global configuration mode, enter the following
+command:
+R1(config)# username JR-ADMIN secret class12345
+R1(config)# username ADMIN secret class54321
+[b]: Set the console line to use the locally defined login accounts. R1(config)# line console 0
+R1(config-line)# login local
+R1(config-line)# exit
+R1(config)#
+[c]: Set the vty lines to use the locally defined login accounts. R1(config)# line vty 0 4
+R1(config-line)# login local
+R1(config-line)# end
+R1(config)#
+[d]: Repeat the steps 4a to 4c on R3. [e]: To verify the configuration, telnet to R3 from R1 and login using the ADMIN local database
+account. R1# telnet 10.2.2.2
+Step 5: Enabling AAA RADIUS Authentication with Local User for Backup. Authentication, authorization, and accounting (AAA) is a standards-based framework that can be
+implemented to control who is permitted to access a network (authenticate), what they can do onthat
+network (authorize), and audit what they did while accessing the network (accounting). [a] : Always have local database accounts created before enabling AAA. Since we created two local
+database accounts in the previous step, then we can proceed and enable AAA on R1. R1(config)# aaa new-model
+[b] : Configure the specifics for the first RADIUS server located at 192.168.1.101. Use RADIUS-1- pa55w0rd as the server password.
+R1(config)# radius server RADIUS-1
+R1(config-radius-server)# address ipv4 192.168.1.101
+R1(config-radius-server)# key RADIUS-1-pa55w0rd
+R1(config-radius-server)# exit
+R1(config)#
+[c] : Configure the specifics for the second RADIUS server located at 192.168.1.102. Use RADIUS-2- pa55w0rd as the server password. R1(config)# radius server RADIUS-2
+R1(config-radius-server)# address ipv4 192.168.1.102
+R1(config-radius-server)# key RADIUS-2-pa55w0rd
+R1(config-radius-server)# exit
+R1(config)#
+[d] : Assign both RADIUS servers to a server group. R1(config)# aaa group server radius RADIUS-GROUP
+R1(config-sg-radius)# server name RADIUS-1
+R1(config-sg-radius)# server name RADIUS-2
+R1(config-sg-radius)# exit
+R1(config)#
+[e] : Enable the default AAA authentication login to attempt to validate against the server group. If
+they are not available, then authentication should be validated against the local database.. R1(config)# aaa authentication login default group RADIUS-GROUP localR1(config)#
+[f] : Enable the default AAA authentication Telnet login to attempt to validate against the server
+group. If they are not available, then authentication should be validated against a case sensitive local
+database. R1(config)# aaa authentication login TELNET-LOGIN group RADIUS-GROUP localcase
+R1(config)#
+[g] : Alter the VTY lines to use the TELNET-LOGIN AAA authentiaito0n method. R1(config)# line vty 0 4
+R1(config-line)# login authentication TELNET-LOGIN
+R1(config-line)# exit
+R1(config)#
+[h] : Repeat the steps 5a to 5g on R3. [i] : To verify the configuration, telnet to R3 from R1 and login using the ADMIN local database
+account. R1# telnet 10.2.2.2
+Step 6: Enabling secure remote management using SSH. Traditionally, remote access on routers was configured using Telnet on TCP port 23. However, Telnet
+was developed in the days when security was not an issue; therefore, all Telnet traffic is forwardedinplaintext. Secure Shell (SSH) is a network protocol that establishes a secure terminal emulation connectiontoarouter or other networking device. SSH encrypts all information that passes over the network linkandprovides authentication of the remote computer. SSH is rapidly replacing Telnet as the remote logintool of choice for network professionals. [a] : SSH requires that a device name and a domain name be configured. Since the router alreadyhas aname assigned, configure the domain name. R1(config)# ip domain-name ccnasecurity.com
+[b] : The router uses the RSA key pair for authentication and encryption of transmitted SSHdata. Although optional it may be wise to erase any existing key pairs on the router. R1(config)# crypto key zeroize rsa
+[c] : Generate the RSA encryption key pair for the router. Configure the RSA keys with 1024 for thenumber of modulus bits. The default is 512, and the range is from 360 to 2048. R1(config)# crypto key generate rsa general-keys modulus 1024
+[d] : Cisco routers support two versions of SSH:
+R1(config)# ip ssh version 2
+[e] : Configure the vty lines to use only SSH connections. R1(config)# line vty 0 4
+R1(config-line)# transport input ssh
+R1(config-line)# end
+[f] : Verify the SSH configuration using the show ip ssh command. R1# show ip ssh
+[g] : Repeat the steps 6a to 6f on R3. [h] : Although a user can SSH from a host using the SSH option of TeraTerm of PuTTY, a router canalso SSH to another SSH enabled device. SSH to R3 from R1. R1# ssh -l ADMIN 10.2.2.2
+
+PRACTICAL NO – 5
+
+AIM :- Configure and Verify Path Control Using PBR
+REQUIREMENTS :- 4 routers (Cisco IOS Release 15.2 or comparable)
+ Serial and Ethernet cables
+TOPOLOGY :-
+CONFIGURATION :-
+Step 1: Configure loopbacks and assign addresses.
+[A]: Cable the network as shown in the topology diagram. Erase the startup configuration, and
+reload .Each router to clear previous configurations.
+[B]: Using the addressing scheme in the diagram, create the loopback interfaces and apply IP
+Addresses to these and the serial interfaces on R1, R2, R3, and R4. On the serial interfaces
+connecting R1 to R3 and R3 to R4, specify the bandwidth as 64 Kb/s and set a clock rate on
+the DCE using the Clock rate 64000 command. On the serial interfaces connecting R1 to R2
+and R2 to R3, specify the Bandwidth as 128 Kb/s and set a clock rate on the DCE using the
+clock rate 128000 command.
+Router R1
+hostname R1
+interface Lo1
+description R1 LAN
+ip address 192.168.1.1 255.255.255.0
+interface Serial 3/0
+description R1 --> R2
+ip address 172.16.12.1 255.255.255.248
+clock rate 128000
+bandwidth 128
+no shutdown
+interface Serial 3/1
+description R1 --> R3
+ip address 172.16.13.1 255.255.255.248
+bandwidth 64
+no shutdown
+end
+Router R2
+hostname R2
+interface Lo2
+description R2 LAN
+ip address 192.168.2.1 255.255.255.0
+interface Serial 3/0
+description R2 --> R1
+ip address 172.16.12.2 255.255.255.248
+bandwidth 128
+no shutdown
+interface Serial 3/1
+description R2 --> R3
+ip address 172.16.23.2 255.255.255.248
+clock rate 128000
+bandwidth 128
+no shutdown
+end
+
+Router R3
+hostname R3
+interface Lo3
+description R3 LAN
+ip address 192.168.3.1 255.255.255.0
+interface Serial 3/0
+description R3 --> R1
+ip address 172.16.13.3 255.255.255.248
+clock rate 64000
+bandwidth 64
+no shutdown
+interface Serial 3/1
+description R3 --> R2
+ip address 172.16.23.3 255.255.255.248
+bandwidth 128
+no shutdown
+interface Serial 3/2
+description R3 --> R4
+ip address 172.16.34.3 255.255.255.248
+clock rate 64000
+bandwidth 64
+no shutdown
+end
+Router R4
+hostname R4
+interface Lo4
+description R4 LAN A
+ip address 192.168.4.1 255.255.255.128
+interface Lo5
+description R4 LAN B
+ip address 192.168.4.129 255.255.255.128
+interface Serial 3/0
+description R4 --> R3
+ip address 172.16.34.4 255.255.255.248
+bandwidth 64
+no shutdown
+end
+[C]: Verify the configuration with the show ip interface brief, show protocols, and show
+interfaces Description commands.
+R3# show ip interface brief | include up
+R3# show protocols
+R3# show interfaces description | include up
+Step 2: Configure basic EIGRP.
+[A]: Implement EIGRP AS 1 over the serial and loopback interfaces as you have configured it
+for the Other EIGRP labs.
+[B]: Advertise networks 172.16.12.0/29, 172.16.13.0/29, 172.16.23.0/29, 172.16.34.0/29,
+192.168.1.0/24, 192.168.2.0/24, 192.168.3.0/24, and 192.168.4.0/24 from their respective
+routers.
+Router R1
+router eigrp 1
+network 192.168.1.0
+network 172.16.12.0 0.0.0.7
+network 172.16.13.0 0.0.0.7
+no auto-summary
+Router R2
+router eigrp 1
+network 192.168.2.0
+network 172.16.12.0 0.0.0.7
+network 172.16.23.0 0.0.0.7
+no auto-summary
+Router R3
+router eigrp 1
+network 192.168.3.0
+network 172.16.13.0 0.0.0.7
+network 172.16.23.0 0.0.0.7
+network 172.16.34.0 0.0.0.7
+no auto-summary
+Router R4
+router eigrp 1
+network 192.168.4.0
+network 172.16.34.0 0.0.0.7
+no auto-summary
+Step 2: Configure basic EIGRP.
+[A]: Implement EIGRP AS 1 over the serial and loopback interfaces as you have configured it
+for the Other EIGRP labs.
+R1# show ip eigrp neighbors
+R2# show ip eigrp neighbors
+R3# show ip eigrp neighbors
+R4# show ip eigrp neighbors
+[B]: Run the following Tcl script on all routers to verify full connectivity.
+R1# tclsh
+foreach address{
+172.16.12.1
+172.16.12.2
+172.16.13.1
+172.16.13.3
+172.16.23.2
+172.16.23.3
+172.16.34.3
+172.16.34.4
+192.168.1.1
+192.168.2.1
+192.168.3.1
+192.168.4.1
+192.168.4.129
+} { ping $address }
+
+Step 3: Verify the current path.
+Before you configure PBR, verify the routing table on R1.
+[A] : On R1, use the show ip route command. Notice the next-hop IP address
+for all networksdiscovered by EIGRP.
+R1# show ip route | begin Gateway
+[B] : On R4, use the traceroute command to the R1 LAN address and source the
+ICMP packet fromR4 LAN A and LAN B.
+R4# traceroute 192.168.1.1 source 192.168.4.1
+R4# traceroute 192.168.1.1 source 192.168.4.129
+[C] : On R3, use the show ip route command and note that the preferred route
+from R3 to R1 LAN192.168.1.0/24 is via R2 using the R3 exit interface S 3/1.
+R3# show ip route | begin Gateway
+[D] : On R3, use the show interfaces serial 3/0 and show interfaces s 3/1 commands.
+R3# show interfaces serial 3/0
+R3# show interfaces serial0/0/0 | include BW
+R3# show interfaces serial0/0/1 | include BW
+[E] : Confirm that R3 has a valid route to reach R1 from its serial 0/0/0 interface
+using the show ipeigrp topology 192.168.1.0 command.
+R3# show ip eigrp topology 192.168.1.0
+Step 4: Configure PBR to provide path control.
+[A]. On router R3, create a standard access list called PBR-ACL to identify the R4 LAN B
+network.
+R3(config)# ip access-list standard PBR-ACL
+R3(config-std-nacl)# remark ACL matches R4 LAN B traffic
+R3(config-std-nacl)# permit 192.168.4.128 0.0.0.127
+R3(config-std-nacl)# exit
+R3(config)#
+[B]. Create a route map called R3-to-R1 that matches PBR-ACL and sets the nexthop interface tothe R1 serial 3/1 interface.
+R3(config)# route-map R3-to-R1 permit
+R3(config-route-map)# description RM to forward LAN B traffic to R1
+R3(config-route-map)# match ip address PBR-ACL
+R3(config-route-map)# set ip next-hop 172.16.13.1
+R3(config-route-map)# exit
+R3(config)#
+[C]: Apply the R3-to-R1 route map to the serial interface on R3 that receives the traffic
+from R4. Usethe ip policy route-map command on interface S 3/2.
+R3(config)# interface s 3/2
+R3(config-if)# ip policy route-map R3-to-R1
+R3(config-if)# end
+R3#
+[D]: On R3, display the policy and matches using the show route-map command.
+R3# show route-map
+Step 5: Test the policy.
+Now you are ready to test the policy configured on R3. Enable the debug ip policy command on R3
+so that you can observe the policy decision-making in action. To help filter the traffic, first create a
+standard ACL that identifies all traffic from the R4 LANs.
+[A]: On R3, create a standard ACL which identifies all of the R4 LANs.
+R3# conf t
+Enter configuration commands, one per line. End with CNTL/Z.
+R3(config)# access-list 1 permit 192.168.4.0 0.0.0.255
+R3(config)# exit
+[B]: Enable PBR debugging only for traffic that matches the R4
+LANs.
+R3# debug ip policy
+R3# debug ip policy 1
+Policy routing debugging is on for access list 1
+[C]: Test the policy from R4 with the traceroute command, using R4 LAN A as the source
+network.
+R4# traceroute 192.168.1.1 source 192.168.4.1
+[D]:Test the policy from R4 with the traceroute command, using R4 LAN B as the
+source network.R4# traceroute 192.168.1.1 source 192.168.4.129
+[E]: On R3, display the policy and matches using the show route-map command.
+R3# show route-map
+OUTPUT :
+Practical no:06
+Aim: IP Service Level Agreements and Remote SPAN in a Campus Environment
+Requirement: Switch (2960-24TT),Router (2620XM),PCs (PC1& PC2),3 copper straight-through
+wires,2 PC-PT.
+Topology:
+Configuration: 1 Assign IP addresses
+10.0.0.1 for PC0
+20.0.0.1 for PC1
+2.For server side connection.
+PC0 is added in the SERVER VLAN as shown above.
+Switch#conf t
+Switch(config)#interface FastEthernet0/0
+Switch(config-if)#switchport access vlan 2
+Switch(config-if)#exit
+3.For client side connection.
+
+PC1 is added in the CLIENT VLAN as shown above.
+Switch#conf t
+Switch(config)#interface FastEthernet0/1
+Switch(config-if)#switchport access vlan 3
+Switch(config-if)#exit
+4. Connect a router to switch at FastEthernet 0/3 as shown in the topology diagram
+To UP the status of fastEthernet 0/0
+Switch#conf t
+Switch(config)#interface fastEthernet 0/3
+Switch(config-if)#switchport mode trunk
+5. Open Router CLI to check the status of the fastEthernet 0/0 port
+Router>en
+Router#show ip interface brief
+A. To create sub interfaces on Router
+To create sub interfaces(0.1) on Router
+Router#conf t
+Router(config)#interface fastEthernet 0/0
+Router(config-if)#no shutdown
+Router#conf t
+Router(config)#interface fastEthernet 0/0.1
+Router(config-subif)#encapsulation dot1Q 2
+Router(config-subif)#ip address 10.0.0.100 255.0.0.0
+Router(config-subif)#exit
+To create sub interfaces(0.2) on Router
+Router#conf t
+Router(config)#interface fastEthernet 0/0.2
+Router(config-subif)#encapsulation dot1Q 3
+Router(config-subif)#ip address 20.0.0.100 255.0.0.0
+Router(config-subif)#^z
+Router(config-subif)#exit
+To provide route for communicating between PCs and Router.
+Router#conf t
+Router(config)#router rip
+Router(config-router)#network 10.0.0.0
+Router(config-router)#network 20.0.0.0
+6. Assign Default Gateway to PC0 10.0.0.100 & Default Gateway to PC1 10.0.0.100.
+
+Output:
+Open Command Prompt of PC0 and check the ip addresses by the command ipconfig.
+Now using the ping command check if the connection is correct and the messages are sent properly
+without any error.
+Commands:
+C:\>ipconfig
+C:\>ping 20.0.0.1
+Repeat same on PC1
+C:
+\
+>ipconfig
+C:
+\>ping 10.0.0.1
+END
+
+Practical 7
+
+Aim: Implementing inter VLAN-routing
+Requirements:
+Cisco Packet Tracer, 2960 Switches, 3650 Multilayer Switch
+Topology:
+Addressing Table:
+Device IP Address Subnet Mask Default Gateway
+PC0 192.168.1.5 255.255.255.0 192.168.1.1
+PC1 192.168.2.5 255.255.255.0 192.168.2.1
+PC2 192.168.1.6 255.255.255.0 192.168.1.1
+PC3 192.168.2.6 255.255.255.0 192.168.2.1
+Configuration:
+Step 1: Perform Basic Switch Configurations
+Switch>en
+Switch#conf t
+Enter configuration commands, one per line. End with CNTL/Z.
+Switch(config)#vlan 10
+Switch(config-vlan)#name Sales
+Switch(config-vlan)#vlan 20
+Switch(config-vlan)#name Marketing
+Switch(config-vlan)#exit
+Step 2: Configure VTP on the Switches
+Switch(config)#int fa0/1
+Switch(config-if)#switchport mode access
+Switch(config-if)#switchport access vlan 10
+Switch(config-if)#int fa0/2
+Switch(config-if)#switchport mode access
+Switch(config-if)#switchport access vlan 20
+Step 3. Configure trunking ports
+Switch(config-if)#switchport mode trunk
+Switch(config-if)#end
+Switch#
+%SYS-5-CONFIG_I: Configured from console by console
+Switch#wri mem
+Building configuration...
+[OK]
+Step 3: Perform Multilayer Switch Configurations
+Switch#conf t
+Enter configuration commands, one per line. End with CNTL/Z.
+Switch(config)#vlan 10
+Switch(config-vlan)#name Sales
+Switch(config-vlan)#vlan 20
+Switch(config-vlan)#name Marketing
+Step 4: Configure VTP on the Multilayer Switch
+Switch(config-vlan)#int vlan 10
+Switch(config-if)#
+%LINK-5-CHANGED: Interface Vlan10, changed state to up
+Switch(config-if)#ip address 192.168.1.1 255.255.255.0
+Switch(config-if)#int vlan 20
+Switch(config-if)#
+%LINK-5-CHANGED: Interface Vlan20, changed state to up
+Switch(config-if)#ip address 192.168.2.1 255.255.255.0
+Switch(config-if)#int g1/0/1
+Switch(config-if)#switchport mode trunk
+Step 5: Configuration Management on Switch to Multilayer Switch
+Switch#conf t
+Enter configuration commands, one per line. End with CNTL/Z.
+Switch(config)#int g0/2
+Switch(config-if)#switchport trunk
+% Incomplete command.
+Switch(config-if)#
+Switch(config-if)#switchport mode trunk
+Switch(config-if)#end
+Switch#
+%SYS-5-CONFIG_I: Configured from console by console
+wri mem
+Step 6: Perform ip routing on Multilayer Switch
+Switch(config-if)#exit
+Switch(config)#end
+%SYS-5-CONFIG_I: Configured from console by console
+Switch#sh ip route
+Default gateway is not set
+Host Gateway Last Use Total Uses Interface
+ICMP redirect cache is empty
+Switch#conf t
+Enter configuration commands, one per line. End with CNTL/Z.
+Switch(config)#ip routing
+Switch(config)#end
+Switch#
+%SYS-5-CONFIG_I: Configured from console by console
+wri mem
+Building configuration...
+Compressed configuration from 7383 bytes to 3601 bytes[OK]
+[OK]
+Switch#sh ip route
+Codes: C - connected, S - static, I - IGRP, R - RIP, M - mobile, B - BGP
+D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+E1 - OSPF external type 1, E2 - OSPF external type 2, E - EGP
+i - IS-IS, L1 - IS-IS level-1, L2 - IS-IS level-2, ia - IS-IS inter area
+* - candidate default, U - per-user static route, o - ODR
+P - periodic downloaded static route
+Gateway of last resort is not set
+C 192.168.1.0/24 is directly connected, Vlan10
+C 192.168.2.0/24 is directly connected, Vlan20
+Output:
+PRACTICAL NO: 08
+AIM: Simulating MPLS environment and simulating VRF.
+REQUIREMENTS: GNS3, 5 routers, Ethernet connection.
+TOPOLOGY:
+COMMANDS:
+R1
+hostname R1
+int lo0
+ip add 1.1.1.1 255.255.255.255
+ip ospf 1 area 0
+int f0/0
+ip add 10.0.0.1 255.255.255.0
+no shut
+ip ospf 1 area 0
+R2
+hostname R2
+int lo0
+ip add 2.2.2.2 255.255.255.255
+ip ospf 1 are 0
+int f0/0
+ip add 10.0.0.2 255.255.255.0
+no shut
+ip ospf 1 area 0
+int f0/1
+ip add 10.0.1.2 255.255.255.0
+no shut
+ip ospf 1 area 0
+R3
+hostname R3
+int lo0
+ip add 3.3.3.3 255.255.255.255
+ip ospf 1 are 0
+int f0/0
+ip add 10.0.1.3 255.255.255.0
+no shut
+ip ospf 1 area 0
+R1#ping 3.3.3.3 source lo0
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 3.3.3.3, timeout is 2 seconds:
+Packet sent with a source address of 1.1.1.1
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 40/52/64 ms
+R1#
+R1
+router ospf 1
+mpls ldp autoconfig
+R2
+router ospf 1
+mpls ldp autoconfig
+R3
+router ospf 1
+mpls ldp autoconfig
+R2#sh mpls interface
+R2#sh mpls ldp neigh
+R1#trace 3.3.3.3
+R1#
+router bgp 1
+neighbor 3.3.3.3 remote-as 1
+neighbor 3.3.3.3 update-source Loopback0
+no auto-summary
+!
+address-family vpnv4
+ neighbor 3.3.3.3 activate
+R3#
+router bgp 1
+neighbor 1.1.1.1 remote-as 1
+neighbor 1.1.1.1 update-source Loopback0
+no auto-summary
+!
+address-family vpnv4
+neighbor 1.1.1.1 activate
+R1#sh bgp vpnv4 unicast all summary
+R4
+int lo0
+ip add 4.4.4.4 255.255.255.255
+ip ospf 2 area 2
+int f0/0
+ip add 192.168.1.4 255.255.255.0
+ip ospf 2 area 2
+no shut
+R1
+int f0/1
+no shut
+ip add 192.168.1.1 255.255.255.0
+R1
+ip vrf RED
+rd 4:4
+route-target both 4:4
+R1
+int f0/1
+ip vrf forwarding RED
+R1(config-if)#ip vrf fo
+R1(config-if)#ip vrf forwarding RED
+% Interface FastEthernet0/1 IP address 192.168.1.1 removed due to enabling VRF RED
+R1
+int f0/1
+ip address 192.168.1.1 255.255.255.0
+R1#sh run int f0/1
+Building configuration...
+Current configuration : 119 bytes
+!
+interface FastEthernet0/1
+ip vrf forwarding RED
+ip address 192.168.1.1 255.255.255.0
+duplex auto
+speed auto
+end
+R1#sh ip route
+Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
+D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external ty
+pe 2
+E1 - OSPF external type 1, E2 - OSPF external type 2
+i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+ia - IS-IS inter area, * - candidate default, U - per-user static route
+o - ODR, P - periodic downloaded static route
+Gateway of last resort is not set
+1.0.0.0/32 is subnetted, 1 subnets
+C 1.1.1.1 is directly connected, Loopback0
+2.0.0.0/32 is subnetted, 1 subnets
+O 2.2.2.2 [110/11] via 10.0.0.2, 01:03:48, FastEthernet0/0
+3.0.0.0/32 is subnetted, 1 subnets
+O 3.3.3.3 [110/21] via 10.0.0.2, 01:02:29, FastEthernet0/0
+10.0.0.0/24 is subnetted, 2 subnets
+C 10.0.0.0 is directly connected, FastEthernet0/0
+O 10.0.1.0 [110/20] via 10.0.0.2, 01:02:39, FastEthernet0/0
+R1#
+R1#sh ip route vrf RED
+Routing Table: RED
+Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
+D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+E1 - OSPF external type 1, E2 - OSPF external type 2
+i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+ia - IS-IS inter area, * - candidate default, U - per-user static route
+o - ODR, P - periodic downloaded static route
+Gateway of last resort is not set
+C 192.168.1.0/24 is directly connected, FastEthernet0/1
+R1#
+R1
+int f0/1
+ip ospf 2 area 2
+R1#sh ip route vrf RED
+Routing Table: RED
+Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
+D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+E1 - OSPF external type 1, E2 - OSPF external type 2
+i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+ia - IS-IS inter area, * - candidate default, U - per-user static route
+o - ODR, P - periodic downloaded static route
+Gateway of last resort is not set
+4.0.0.0/32 is subnetted, 1 subnets
+O 4.4.4.4 [110/11] via 192.168.1.4, 00:00:22, FastEthernet0/1
+C 192.168.1.0/24 is directly connected, FastEthernet0/1
+R1#
+R5
+int lo0
+ip add 6.6.6.6 255.255.255.255
+ip ospf 2 area 2
+int f0/0
+ip add 192.168.2.6 255.255.255.0
+ip ospf 2 area 2
+no shut
+R3
+int f0/1
+no shut
+ip add 192.168.2.3 255.255.255.0
+R3
+ip vrf RED
+rd 4:4
+route-target both 4:4
+R3
+int f0/1
+ip vrf forwarding RED
+R3(config-if)#ip vrf forwarding RED
+% Interface FastEthernet0/1 IP address 192.168.2.1 removed due to enabling VRF RED
+R3
+int f0/1
+ip address 192.168.2.1 255.255.255.0
+R3
+R3#sh run int f0/1
+Building configuration...
+Current configuration : 119 bytes
+!
+interface FastEthernet0/1
+ip vrf forwarding RED
+ip address 192.168.2.1 255.255.255.0
+duplex auto
+speed auto
+R3
+int f0/1
+ip ospf 2 area 2
+R3#sh ip route vrf RED
+Routing Table: RED
+Codes: C - connected, S - static, R - RIP, M - mobile, B - BGP
+Gateway of last resort is not set
+ 6.0.0.0/32 is subnetted, 1 subnets
+O 6.6.6.6 [110/11] via 192.168.2.6, 00:02:44, FastEthernet0/1
+C 192.168.2.0/24 is directly connected, FastEthernet0/1
+R3#
+R4#sh ip route
+4.0.0.0/32 is subnetted, 1 subnets
+C 4.4.4.4 is directly connected, Loopback0
+C 192.168.1.0/24 is directly connected, FastEthernet0/0
+R1#sh ip route
+1.0.0.0/32 is subnetted, 1 subnets
+C 1.1.1.1 is directly connected, Loopback0
+2.0.0.0/32 is subnetted, 1 subnets
+O 2.2.2.2 [110/11] via 10.0.0.2, 00:01:04, FastEthernet0/0
+3.0.0.0/32 is subnetted, 1 subnets
+O 3.3.3.3 [110/21] via 10.0.0.2, 00:00:54, FastEthernet0/0
+10.0.0.0/24 is subnetted, 2 subnets
+C 10.0.0.0 is directly connected, FastEthernet0/0
+O 10.0.1.0 [110/20] via 10.0.0.2, 00:00:54, FastEthernet0/0
+R1#sh ip route vrf RED
+Routing Table: RED
+4.0.0.0/32 is subnetted, 1 subnets
+O 4.4.4.4 [110/11] via 192.168.1.4, 00:02:32, FastEthernet0/1
+C 192.168.1.0/24 is directly connected, FastEthernet0/1
+R1
+router bgp 1
+address-family ipv4 vrf RED
+redistribute ospf 2
+R3
+router bgp 1
+address-family ipv4 vrf RED
+redistribute ospf 2
+R1#sh ip bgp vpnv4 vrf RED
+R3#sh ip bgp vpnv4 vrf RED
+R1
+router ospf 2
+redistribute bgp 1 subnets
+R3
+router ospf 2
+redistribute bgp 1 subnets
+R4#sh ip route
+R5#sh ip route
+OUTPUT:
+Ping and trace R6 in R4.
+-------
+
+GNS3
+botlobby--> kalina-Cs-dept
+https://sdn91.wordpress.com/
+https://drive.google.com/drive/folders/1JfOWAZZB4NXB5D6tX4qogCttlAbX76NU
+
